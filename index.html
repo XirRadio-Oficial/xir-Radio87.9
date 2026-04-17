@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XIR RADIO - PREMIUM LIVE</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050507;
+            --gold: #FFD700;
+            --glass: rgba(255, 255, 255, 0.07);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        body {
+            margin: 0; background: var(--bg); color: #fff;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+            position: relative;
+        }
+
+        #bg-layer {
+            position: absolute; inset: 0;
+            background-size: cover; background-position: center;
+            filter: brightness(0.4) blur(10px);
+            z-index: -1; transition: background 0.5s ease;
+            background-image: radial-gradient(circle at bottom, #1a1a2e 0%, #050507 100%);
+        }
+
+        header { 
+            padding: 15px; text-align: center; border-bottom: 1px solid var(--glass); 
+            background: rgba(0,0,0,0.4); backdrop-filter: blur(10px);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        #clock { font-size: 11px; color: var(--gold); font-weight: 800; letter-spacing: 2px; flex: 1; }
+        
+        .btn-bg-picker {
+            background: rgba(255,255,255,0.1); border: none; border-radius: 8px;
+            padding: 5px 8px; cursor: pointer; font-size: 16px;
+        }
+
+        .user-profile-section {
+            display: flex; align-items: center; padding: 12px 20px; gap: 12px;
+            background: rgba(0,0,0,0.2); backdrop-filter: blur(5px);
+        }
+        .avatar-container { position: relative; width: 45px; height: 45px; cursor: pointer; }
+        .user-avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); }
+        .plus-icon {
+            position: absolute; bottom: -2px; right: -2px; background: var(--gold);
+            color: #000; width: 16px; height: 16px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900;
+        }
+
+        .chat-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg-row { display: flex; gap: 10px; align-items: flex-end; }
+        .msg-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+        .bubble { padding: 10px 14px; border-radius: 15px 15px 15px 3px; font-size: 14px; background: rgba(0,0,0,0.4); backdrop-filter: blur(8px); border: 1px solid var(--glass); }
+        .bubble b { color: var(--gold); display: block; font-size: 11px; }
+
+        .radio-console { background: rgba(15, 15, 20, 0.95); padding: 25px 20px; border-radius: 35px 35px 0 0; border-top: 1px solid var(--glass); }
+        .dj-tools { display: none; justify-content: center; align-items: center; gap: 35px; margin-bottom: 20px; }
+        
+        .btn-glass-pro {
+            width: 67px; height: 67px; border-radius: 50%; border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s; box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        .btn-glass-pro svg { width: 40%; height: 40%; fill: rgba(255, 255, 255, 0.6); }
+
+        .status-player {
+            width: 100%; background: #000; padding: 12px; border-radius: 50px;
+            display: flex; align-items: center; gap: 12px; margin-bottom: 15px; border: 1px solid #222;
+        }
+        .live-tag { background: #ff3131; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 800; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        .input-area { background: #1c1c24; padding: 8px 8px 8px 20px; border-radius: 30px; display: flex; align-items: center; gap: 10px; }
+        .input-area input { flex: 1; background: transparent; border: none; color: #fff; outline: none; }
+        .send-btn { background: var(--gold); border: none; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; }
+
+        #profileModal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: #1a1a24; padding: 30px; border-radius: 25px; width: 80%; max-width: 300px; text-align: center; border: 1px solid var(--gold); }
+    </style>
+</head>
+<body>
+
+    <div id="bg-layer"></div>
+
+    <header>
+        <div style="width: 40px;"></div> <div id="clock">00:00:00</div>
+        <button class="btn-bg-picker" onclick="document.getElementById('bgInput').click()">🖼️</button>
+    </header>
+
+    <div class="user-profile-section">
+        <div class="avatar-container" onclick="openModal()">
+            <img id="myAvatar" class="user-avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png">
+            <div class="plus-icon">+</div>
+        </div>
+        <div class="user-info" onclick="openModal()">
+            <b id="myName">Cargando...</b><br>
+            <small style="color: var(--gold); font-size: 10px;">CONFIGURAR PERFIL</small>
+        </div>
+    </div>
+
+    <div class="chat-container" id="chatBox"></div>
+
+    <div class="radio-console">
+        <div class="dj-tools" id="djControls">
+            <button class="btn-glass-pro" onclick="document.getElementById('fileInput').click()">
+                <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </button>
+            <button class="btn-glass-pro" id="mainMic">
+                <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zM17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            </button>
+            <input type="file" id="fileInput" hidden accept="audio/mp3">
+        </div>
+
+        <div class="status-player">
+            <div class="live-tag">LIVE</div>
+            <div style="font-size: 13px; font-weight: 700;">RADIO EN LÍNEA EN VIVO</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="msgInput" placeholder="Escribe un mensaje..." autocomplete="off">
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <input type="file" id="bgInput" hidden accept="image/*">
+    <input type="file" id="avatarInput" hidden accept="image/*">
+    
+    <div id="profileModal">
+        <div class="modal-content">
+            <h2 style="color: var(--gold); margin-top:0;">Tu Perfil</h2>
+            <input type="text" id="newNameInput" style="width:100%; padding:10px; margin-bottom:15px; background:#000; color:#fff; border:none; text-align:center; border-radius:10px;" placeholder="Tu nombre...">
+            <button style="background:var(--gold); border:none; padding:10px 20px; border-radius:20px; font-weight:800;" onclick="saveProfile()">GUARDAR</button>
+        </div>
+    </div>
+
+    <audio id="voiceStream" autoplay></audio>
+
+    <script>
+        const firebaseConfig = { projectId: "ci-chat-332ec", databaseURL: "https://ci-chat-332ec-default-rtdb.firebaseio.com" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const savedBg = localStorage.getItem('radio_bg');
+        if(savedBg) document.getElementById('bg-layer').style.backgroundImage = `url(${savedBg})`;
+
+        document.getElementById('bgInput').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                document.getElementById('bg-layer').style.backgroundImage = `url(${ev.target.result})`;
+                localStorage.setItem('radio_bg', ev.target.result);
+            };
+            reader.readAsDataURL(file);
+        };
+
+        let currentUser = {
+            name: localStorage.getItem('radio_name') || "Oyente_" + Math.floor(Math.random()*999),
+            photo: localStorage.getItem('radio_photo') || "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+        };
+
+        function updateUI() {
+            document.getElementById('myName').innerText = currentUser.name;
+            document.getElementById('myAvatar').src = currentUser.photo;
+        }
+        updateUI();
+
+        function openModal() { document.getElementById('profileModal').style.display = 'flex'; }
+        function saveProfile() {
+            const n = document.getElementById('newNameInput').value.trim();
+            if(n) {
+                currentUser.name = n;
+                localStorage.setItem('radio_name', n);
+                document.getElementById('profileModal').style.display = 'none';
+                document.getElementById('avatarInput').click();
+            }
+        }
+
+        document.getElementById('avatarInput').onchange = (e) => {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                currentUser.photo = ev.target.result;
+                localStorage.setItem('radio_photo', ev.target.result);
+                updateUI();
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function sendMessage() {
+            const val = document.getElementById('msgInput').value.trim();
+            if(val === "xir_admin") {
+                document.getElementById('djControls').style.display = 'flex';
+                document.getElementById('msgInput').value = "";
+                return;
+            }
+            if(!val) return;
+            db.collection("chat_vip").add({
+                user: currentUser.name, photo: currentUser.photo,
+                msg: val, time: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            document.getElementById('msgInput').value = "";
+        }
+
+        db.collection("chat_vip").orderBy("time", "desc").limit(10).onSnapshot(snap => {
+            const box = document.getElementById('chatBox');
+            box.innerHTML = "";
+            snap.docs.reverse().forEach(doc => {
+                const d = doc.data();
+                if(d.msg) {
+                    box.innerHTML += `<div class="msg-row"><img src="${d.photo}" class="msg-avatar"><div class="bubble"><b>${d.user}</b>${d.msg}</div></div>`;
+                }
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+
+        let recorder; let chunks = [];
+        const mainMic = document.getElementById('mainMic');
+        async function startStreaming() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                recorder = new MediaRecorder(stream);
+                recorder.ondataavailable = e => chunks.push(e.data);
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = () => db.collection("radio_live").doc("voice_stream").set({ audio: reader.result, sentAt: Date.now() });
+                    reader.readAsDataURL(blob); chunks = [];
+                };
+                recorder.start();
+            } catch (err) {}
+        }
+
+        db.collection("radio_live").doc("voice_stream").onSnapshot(doc => {
+            if(doc.exists) {
+                const data = doc.data();
+                if(Date.now() - data.sentAt < 3000) {
+                    const audio = document.getElementById('voiceStream');
+                    audio.src = data.audio;
+                    audio.play();
+                }
+            }
+        });
+
+        mainMic.addEventListener('mousedown', startStreaming);
+        mainMic.addEventListener('mouseup', () => recorder && recorder.stop());
+        mainMic.addEventListener('touchstart', (e) => { e.preventDefault(); startStreaming(); });
+        mainMic.addEventListener('touchend', () => recorder && recorder.stop());
+
+        setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString(); }, 1000);
+    </script>
+</body>
+</html>
